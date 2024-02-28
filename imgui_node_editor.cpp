@@ -544,9 +544,37 @@ static void ImDrawList_AddBezierWithArrows(ImDrawList* drawList, const ImCubicBe
         drawList->PathStroke(color, true, strokeThickness);
     }
 }
+//------------------------------------------------------------------------------
+//
+// Port
+//
+//------------------------------------------------------------------------------
+void ed::Port::Draw(ImDrawList* drawList, DrawFlags flags)
+{
+    // TODO WireMaster implement port draw here
 
+    if (flags == Detail::Object::None)
+    {
+        drawList->ChannelsSetCurrent(m_Node->m_Channel + c_NodePinChannel);
 
+        drawList->AddRectFilled(
+            m_Bounds.Min,
+            m_Bounds.Max,
+            m_Color, m_Rounding);
 
+        DrawBorder(drawList, m_BorderColor, m_BorderWidth);
+    }
+}
+void ed::Port::DrawBorder(ImDrawList* drawList, ImU32 color, float thickness, float offset)
+{
+    if (thickness > 0.0f)
+    {
+        const ImVec2 extraOffset = ImVec2(offset, offset);
+
+        drawList->AddRect(m_Bounds.Min - extraOffset, m_Bounds.Max + extraOffset,
+            color, ImMax(0.0f, m_Rounding + offset), c_AllRoundCornersFlags, thickness);
+    }
+}
 
 //------------------------------------------------------------------------------
 //
@@ -1278,6 +1306,11 @@ void ed::EditorContext::End()
     for (auto node : m_Nodes)
         if (node->m_IsLive && node->IsVisible())
             node->Draw(m_DrawList);
+    
+    // Draw ports
+    for (auto port : m_Ports)
+        if (port->m_IsLive && port->IsVisible())
+            port->Draw(m_DrawList);
 
     // Draw links
     for (auto link : m_Links)
@@ -2033,6 +2066,15 @@ ed::Pin* ed::EditorContext::CreatePin(PinId id, PinKind kind)
     return pin;
 }
 
+ed::Port* ed::EditorContext::CreatePort(PortId id, PortKind kind)
+{
+    IM_ASSERT(nullptr == FindObject(id));
+    auto pin = new Port(this, id, kind);
+    m_Ports.push_back({id, pin});
+    std::sort(m_Pins.begin(), m_Pins.end());
+    return pin;
+}
+
 ed::Node* ed::EditorContext::CreateNode(NodeId id)
 {
     IM_ASSERT(nullptr == FindObject(id));
@@ -2121,6 +2163,11 @@ ed::Link* ed::EditorContext::FindLink(LinkId id)
     return FindItemIn(m_Links, id);
 }
 
+ed::Port* ed::EditorContext::FindPort(PortId id)
+{
+    // return FindItemIn(m_Ports, id);
+}
+
 ed::Object* ed::EditorContext::FindObject(ObjectId id)
 {
     if (id.IsNodeId())
@@ -2150,6 +2197,17 @@ ed::Pin* ed::EditorContext::GetPin(PinId id, PinKind kind)
     }
     else
         return CreatePin(id, kind);
+}
+
+ed::Port* ed::EditorContext::GetPort(PortId id, PortKind kind)
+{
+    if (auto port = FindPort(id))
+    {
+        port->m_Kind = kind;
+        return port;
+    }
+    else
+        return CreatePort(id, kind);
 }
 
 ed::Link* ed::EditorContext::GetLink(LinkId id)
@@ -4257,6 +4315,8 @@ ed::EditorAction::AcceptResult ed::ContextMenuAction::Accept(const Control& cont
                 candidateMenu = Pin;
             else if (hotObejct->AsLink())
                 candidateMenu = Link;
+            else if (hotObejct->AsPort())
+                candidateMenu = Port;
 
             if (candidateMenu != None)
                 contextId = hotObejct->ID();
@@ -4318,6 +4378,7 @@ void ed::ContextMenuAction::ShowMetrics()
             case Node:        return "Node";
             case Pin:         return "Pin";
             case Link:        return "Link";
+            case Port:        return "Port";
             case Background:  return "Background";
         }
     };
@@ -5376,6 +5437,79 @@ void ed::NodeBuilder::BeginPin(PinId pinId, PinKind kind)
 }
 
 void ed::NodeBuilder::EndPin()
+{
+    IM_ASSERT(nullptr != m_CurrentPin);
+
+    if (auto drawList = Editor->GetDrawList())
+    {
+        IM_ASSERT(drawList->_Splitter._Count == 1); // Did you forgot to call drawList->ChannelsMerge()?
+        ImDrawList_SwapSplitter(drawList, m_PinSplitter);
+    }
+
+    ImGui::EndGroup();
+
+    if (m_ResolvePinRect)
+        m_CurrentPin->m_Bounds = ImGui_GetItemRect();
+
+    if (m_ResolvePivot)
+    {
+        auto& pinRect = m_CurrentPin->m_Bounds;
+
+        if (m_PivotSize.x < 0)
+            m_PivotSize.x = pinRect.GetWidth();
+        if (m_PivotSize.y < 0)
+            m_PivotSize.y = pinRect.GetHeight();
+
+        m_CurrentPin->m_Pivot.Min = pinRect.Min + ImMul(pinRect.GetSize(), m_PivotAlignment);
+        m_CurrentPin->m_Pivot.Max = m_CurrentPin->m_Pivot.Min + ImMul(m_PivotSize, m_PivotScale);
+    }
+
+    // #debug: Draw pin bounds
+    //Editor->GetDrawList()->AddRect(m_CurrentPin->m_Bounds.Min, m_CurrentPin->m_Bounds.Max, IM_COL32(255, 255, 0, 255));
+
+    // #debug: Draw pin pivot rectangle
+    //Editor->GetDrawList()->AddRect(m_CurrentPin->m_Pivot.Min, m_CurrentPin->m_Pivot.Max, IM_COL32(255, 0, 255, 255));
+
+    m_CurrentPin = nullptr;
+}
+
+
+void ed::NodeBuilder::BeginPort(PortId portId, PortKind kind)
+{
+    IM_ASSERT(nullptr != m_CurrentNode);
+    IM_ASSERT(nullptr == m_CurrentPin);
+    IM_ASSERT(false   == m_IsGroup);
+
+    auto& editorStyle = Editor->GetStyle();
+
+    m_CurrentPort = Editor->GetPort(portId, kind);
+    m_CurrentPort->m_Node = m_CurrentNode;
+
+    m_CurrentPort->m_IsLive      = true;
+    m_CurrentPort->m_Color       = Editor->GetColor(StyleColor_PinRect);
+    m_CurrentPort->m_BorderColor = Editor->GetColor(StyleColor_PinRectBorder);
+    m_CurrentPort->m_BorderWidth = editorStyle.PinBorderWidth;
+    m_CurrentPort->m_Rounding    = editorStyle.PinRounding;
+    m_CurrentPort->m_Corners     = static_cast<int>(editorStyle.PinCorners);
+    m_CurrentPort->m_Radius      = editorStyle.PinRadius;
+    m_CurrentPort->m_ArrowSize   = editorStyle.PinArrowSize;
+    m_CurrentPort->m_ArrowWidth  = editorStyle.PinArrowWidth;
+    m_CurrentPort->m_Dir         = kind == PortKind::Output ? editorStyle.SourceDirection : editorStyle.TargetDirection;
+    m_CurrentPort->m_Strength    = editorStyle.LinkStrength;
+    m_CurrentPort->m_SnapLinkToDir = editorStyle.SnapLinkToPinDir != 0.0f;
+
+    m_CurrentNode->m_LastPort    = m_CurrentPort;
+
+    if (auto drawList = Editor->GetDrawList())
+    {
+        m_PinSplitter.Clear();
+        ImDrawList_SwapSplitter(drawList, m_PinSplitter);
+    }
+
+    ImGui::BeginGroup();
+}
+
+void ed::NodeBuilder::EndPort()
 {
     IM_ASSERT(nullptr != m_CurrentPin);
 

@@ -40,10 +40,17 @@ namespace NodeEditor {
 struct NodeId;
 struct LinkId;
 struct PinId;
+struct PortId;
 
 
 //------------------------------------------------------------------------------
 enum class PinKind
+{
+    Input,
+    Output
+};
+
+enum class PortKind
 {
     Input,
     Output
@@ -307,6 +314,7 @@ IMGUI_NODE_EDITOR_API void Begin(const char* id, const ImVec2& size = ImVec2(0, 
 IMGUI_NODE_EDITOR_API void End();
 
 IMGUI_NODE_EDITOR_API void BeginNode(NodeId id);
+IMGUI_NODE_EDITOR_API void BeginPort(PortId id, PortKind kind);
 IMGUI_NODE_EDITOR_API void BeginPin(PinId id, PinKind kind);
 IMGUI_NODE_EDITOR_API void PinRect(const ImVec2& a, const ImVec2& b);
 IMGUI_NODE_EDITOR_API void PinPivotRect(const ImVec2& a, const ImVec2& b);
@@ -314,6 +322,7 @@ IMGUI_NODE_EDITOR_API void PinPivotSize(const ImVec2& size);
 IMGUI_NODE_EDITOR_API void PinPivotScale(const ImVec2& scale);
 IMGUI_NODE_EDITOR_API void PinPivotAlignment(const ImVec2& alignment);
 IMGUI_NODE_EDITOR_API void EndPin();
+IMGUI_NODE_EDITOR_API void EndPort();
 IMGUI_NODE_EDITOR_API void Group(const ImVec2& size);
 IMGUI_NODE_EDITOR_API void EndNode();
 
@@ -520,6 +529,10 @@ struct PinId final: Details::SafePointerType<PinId>
     using SafePointerType::SafePointerType;
 };
 
+struct PortId final: Details::SafePointerType<PortId>
+{
+    using SafePointerType::SafePointerType;
+};
 
 //------------------------------------------------------------------------------
 } // namespace Editor

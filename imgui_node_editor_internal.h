@@ -137,7 +137,8 @@ enum class ObjectType
     None,
     Node,
     Link,
-    Pin
+    Pin,
+    Port
 };
 
 using ax::NodeEditor::PinKind;
@@ -158,18 +159,22 @@ struct ObjectId final: Details::SafePointerType<ObjectId>
     ObjectId(PinId  pinId):      Super(pinId.AsPointer()),    m_Type(ObjectType::Pin)    {}
     ObjectId(NodeId nodeId):     Super(nodeId.AsPointer()),   m_Type(ObjectType::Node)   {}
     ObjectId(LinkId linkId):     Super(linkId.AsPointer()),   m_Type(ObjectType::Link)   {}
+    ObjectId(PortId portId):     Super(portId.AsPointer()),   m_Type(ObjectType::Link)   {}
 
     explicit operator PinId()    const { return AsPinId();    }
     explicit operator NodeId()   const { return AsNodeId();   }
     explicit operator LinkId()   const { return AsLinkId();   }
+    explicit operator PortId()   const { return AsPortId();   }
 
     PinId    AsPinId()    const { IM_ASSERT(IsPinId());    return PinId(AsPointer());    }
     NodeId   AsNodeId()   const { IM_ASSERT(IsNodeId());   return NodeId(AsPointer());   }
     LinkId   AsLinkId()   const { IM_ASSERT(IsLinkId());   return LinkId(AsPointer());   }
+    PortId   AsPortId()   const { IM_ASSERT(IsPortId());   return PortId(AsPointer());   }
 
     bool IsPinId()    const { return m_Type == ObjectType::Pin;    }
     bool IsNodeId()   const { return m_Type == ObjectType::Node;   }
     bool IsLinkId()   const { return m_Type == ObjectType::Link;   }
+    bool IsPortId()   const { return m_Type == ObjectType::Port;   }
 
     ObjectType Type() const { return m_Type; }
 
@@ -182,6 +187,7 @@ struct EditorContext;
 struct Node;
 struct Pin;
 struct Link;
+struct Port;
 
 template <typename T, typename Id = typename T::IdType>
 struct ObjectWrapper
@@ -283,6 +289,7 @@ struct Object
     virtual Node*  AsNode()  { return nullptr; }
     virtual Pin*   AsPin()   { return nullptr; }
     virtual Link*  AsLink()  { return nullptr; }
+    virtual Port*  AsPort()  { return nullptr; }
 };
 
 struct Pin final: Object
@@ -352,6 +359,74 @@ struct Pin final: Object
     virtual Pin* AsPin() override final { return this; }
 };
 
+struct Port final: Object
+{
+    using IdType = PortId;
+
+    PortId   m_ID;
+    PortKind m_Kind;
+    Node*   m_Node;
+    ImRect  m_Bounds;
+    ImRect  m_Pivot;
+    Port*    m_PreviousPort;
+    ImU32   m_Color;
+    ImU32   m_BorderColor;
+    float   m_BorderWidth;
+    float   m_Rounding;
+    int     m_Corners;
+    ImVec2  m_Dir;
+    float   m_Strength;
+    float   m_Radius;
+    float   m_ArrowSize;
+    float   m_ArrowWidth;
+    bool    m_SnapLinkToDir;
+    bool    m_HasConnection;
+    bool    m_HadConnection;
+
+    Port(EditorContext* editor, PortId id, PortKind kind)
+        : Object(editor)
+        , m_ID(id)
+        , m_Kind(kind)
+        , m_Node(nullptr)
+        , m_Bounds()
+        , m_PreviousPort(nullptr)
+        , m_Color(IM_COL32_WHITE)
+        , m_BorderColor(IM_COL32_BLACK)
+        , m_BorderWidth(0)
+        , m_Rounding(0)
+        , m_Corners(0)
+        , m_Dir(0, 0)
+        , m_Strength(0)
+        , m_Radius(0)
+        , m_ArrowSize(0)
+        , m_ArrowWidth(0)
+        , m_SnapLinkToDir(true)
+        , m_HasConnection(false)
+        , m_HadConnection(false)
+    {
+    }
+
+    virtual ObjectId ID() override { return m_ID; }
+
+    virtual void Reset() override final
+    {
+        m_HadConnection = m_HasConnection && m_IsLive;
+        m_HasConnection = false;
+
+        Object::Reset();
+    }
+
+    virtual void Draw(ImDrawList* drawList, DrawFlags flags = None) override final;
+    void DrawBorder(ImDrawList* drawList, ImU32 color, float thickness = 1.0f, float offset = 0.0f);
+    ImVec2 GetClosestPoint(const ImVec2& p) const;
+    ImLine GetClosestLine(const Port* Port) const;
+
+    virtual ImRect GetBounds() const override final { return m_Bounds; }
+
+    virtual Port* AsPort() override final { return this; }
+};
+
+
 enum class NodeType
 {
     Node,
@@ -387,6 +462,7 @@ struct Node final: Object
     float    m_ZPosition;
     int      m_Channel;
     Pin*     m_LastPin;
+    Port*     m_LastPort;
     ImVec2   m_DragStart;
 
     ImU32    m_Color;
@@ -986,7 +1062,7 @@ struct SelectAction final: EditorAction
 
 struct ContextMenuAction final: EditorAction
 {
-    enum Menu { None, Node, Pin, Link, Background };
+    enum Menu { None, Node, Pin, Link, Port, Background };
 
     Menu m_CandidateMenu;
     Menu m_CurrentMenu;
@@ -1176,6 +1252,7 @@ struct NodeBuilder
 
     Node* m_CurrentNode;
     Pin*  m_CurrentPin;
+    Port*  m_CurrentPort;
 
     ImRect m_NodeRect;
 
@@ -1200,6 +1277,9 @@ struct NodeBuilder
 
     void BeginPin(PinId pinId, PinKind kind);
     void EndPin();
+
+    void BeginPort(PortId portId, PortKind kind);
+    void EndPort();
 
     void PinRect(const ImVec2& a, const ImVec2& b);
     void PinPivotRect(const ImVec2& a, const ImVec2& b);
@@ -1379,16 +1459,19 @@ struct EditorContext
     int CountLiveLinks() const;
 
     Pin*    CreatePin(PinId id, PinKind kind);
+    Port*   CreatePort(PortId id, PortKind kind);
     Node*   CreateNode(NodeId id);
     Link*   CreateLink(LinkId id);
 
     Node*   FindNode(NodeId id);
     Pin*    FindPin(PinId id);
     Link*   FindLink(LinkId id);
+    Port*   FindPort(PortId id);
     Object* FindObject(ObjectId id);
 
     Node*  GetNode(NodeId id);
     Pin*   GetPin(PinId id, PinKind kind);
+    Port*  GetPort(PortId id, PortKind kind);
     Link*  GetLink(LinkId id);
 
     Link* FindLinkAt(const ImVec2& p);
@@ -1498,6 +1581,7 @@ private:
     vector<ObjectWrapper<Node>> m_Nodes;
     vector<ObjectWrapper<Pin>>  m_Pins;
     vector<ObjectWrapper<Link>> m_Links;
+    vector<ObjectWrapper<Port>> m_Ports;
 
     vector<Object*>     m_SelectedObjects;
 

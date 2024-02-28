@@ -148,6 +148,11 @@ void ax::NodeEditor::BeginNode(NodeId id)
     s_Editor->GetNodeBuilder().Begin(id);
 }
 
+void ax::NodeEditor::BeginPort(PortId id, PortKind kind)
+{
+    s_Editor->GetNodeBuilder().BeginPort(id, kind);
+}
+
 void ax::NodeEditor::BeginPin(PinId id, PinKind kind)
 {
     s_Editor->GetNodeBuilder().BeginPin(id, kind);
@@ -181,6 +186,11 @@ void ax::NodeEditor::PinPivotAlignment(const ImVec2& alignment)
 void ax::NodeEditor::EndPin()
 {
     s_Editor->GetNodeBuilder().EndPin();
+}
+
+void ax::NodeEditor::EndPort()
+{
+    s_Editor->GetNodeBuilder().EndPort();
 }
 
 void ax::NodeEditor::Group(const ImVec2& size)
