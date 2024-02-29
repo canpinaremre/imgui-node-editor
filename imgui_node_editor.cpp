@@ -4096,6 +4096,7 @@ void ed::DragAction::ShowMetrics()
         else if (object->AsNode())  return "Node";
         else if (object->AsPin())   return "Pin";
         else if (object->AsLink())  return "Link";
+        else if (object->AsPort())  return "Port";
         else return "";
     };
 
@@ -5480,12 +5481,11 @@ void ed::NodeBuilder::EndPin()
 
 void ed::NodeBuilder::BeginPort(PortId portId, PortKind kind)
 {
+    IM_ASSERT(nullptr != m_CurrentNode);
     IM_ASSERT(nullptr == m_CurrentPort);
+    IM_ASSERT(false   == m_IsGroup);
 
     m_CurrentPort = Editor->GetPort(portId, kind);
-
-    // Position node on screen
-    ImGui::SetCursorScreenPos(m_CurrentNode->m_Bounds.Min);
 
     auto& editorStyle = Editor->GetStyle();
 
@@ -5498,6 +5498,9 @@ void ed::NodeBuilder::BeginPort(PortId portId, PortKind kind)
     m_CurrentPort->m_BorderWidth      = editorStyle.PortBorderWidth;
     m_CurrentPort->m_Rounding         = editorStyle.PortRounding;
 
+    m_CurrentPort->m_PreviousPort = m_CurrentNode->m_LastPort;
+    m_CurrentNode->m_LastPort = m_CurrentPort;
+
     m_IsGroup = false;
     
     if (auto drawList = Editor->GetDrawList())
@@ -5508,6 +5511,8 @@ void ed::NodeBuilder::BeginPort(PortId portId, PortKind kind)
 
     // Begin outer group
     ImGui::BeginGroup();
+
+    m_CurrentPort->m_Bounds.Min = ImGui::GetCursorPos();
 
     // Apply frame padding. Begin inner group if necessary.
     if (editorStyle.NodePadding.x != 0 || editorStyle.NodePadding.y != 0 || editorStyle.NodePadding.z != 0 || editorStyle.NodePadding.w != 0)
