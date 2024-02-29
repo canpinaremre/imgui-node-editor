@@ -1147,6 +1147,7 @@ ed::EditorContext::~EditorContext()
     for (auto link  : m_Links)  delete link.m_Object;
     for (auto pin   : m_Pins)   delete pin.m_Object;
     for (auto node  : m_Nodes)  delete node.m_Object;
+    for (auto port  : m_Ports)  delete port.m_Object;
 
     m_Splitter.ClearFreeMemory();
 }
@@ -1196,6 +1197,7 @@ void ed::EditorContext::Begin(const char* id, const ImVec2& size)
     resetAndCollect(m_Nodes);
     resetAndCollect(m_Pins);
     resetAndCollect(m_Links);
+    resetAndCollect(m_Ports);
 
     m_DrawList = ImGui::GetWindowDrawList();
 
@@ -2165,7 +2167,7 @@ ed::Link* ed::EditorContext::FindLink(LinkId id)
 
 ed::Port* ed::EditorContext::FindPort(PortId id)
 {
-    // return FindItemIn(m_Ports, id);
+    return FindItemIn(m_Ports, id);
 }
 
 ed::Object* ed::EditorContext::FindObject(ObjectId id)
@@ -5251,6 +5253,7 @@ ed::Object* ed::DeleteItemsAction::DropCurrentItem()
 ed::NodeBuilder::NodeBuilder(EditorContext* editor):
     Editor(editor),
     m_CurrentNode(nullptr),
+    m_CurrentPort(nullptr),
     m_CurrentPin(nullptr)
 {
 }
@@ -5259,6 +5262,7 @@ ed::NodeBuilder::~NodeBuilder()
 {
     m_Splitter.ClearFreeMemory();
     m_PinSplitter.ClearFreeMemory();
+    m_PortSplitter.ClearFreeMemory();
 }
 
 void ed::NodeBuilder::Begin(NodeId nodeId)
@@ -5476,74 +5480,78 @@ void ed::NodeBuilder::EndPin()
 
 void ed::NodeBuilder::BeginPort(PortId portId, PortKind kind)
 {
-    IM_ASSERT(nullptr != m_CurrentNode);
-    IM_ASSERT(nullptr == m_CurrentPin);
-    IM_ASSERT(false   == m_IsGroup);
+    IM_ASSERT(nullptr == m_CurrentPort);
+
+    m_CurrentPort = Editor->GetPort(portId, kind);
+
+    // Position node on screen
+    ImGui::SetCursorScreenPos(m_CurrentNode->m_Bounds.Min);
 
     auto& editorStyle = Editor->GetStyle();
 
-    m_CurrentPort = Editor->GetPort(portId, kind);
     m_CurrentPort->m_Node = m_CurrentNode;
+    
+    const auto alpha = ImGui::GetStyle().Alpha;
+    m_CurrentPort->m_IsLive           = true;
+    m_CurrentPort->m_Color            = Editor->GetColor(StyleColor_PortBg, alpha);
+    m_CurrentPort->m_BorderColor      = Editor->GetColor(StyleColor_PortBorder, alpha);
+    m_CurrentPort->m_BorderWidth      = editorStyle.PortBorderWidth;
+    m_CurrentPort->m_Rounding         = editorStyle.PortRounding;
 
-    m_CurrentPort->m_IsLive      = true;
-    m_CurrentPort->m_Color       = Editor->GetColor(StyleColor_PinRect);
-    m_CurrentPort->m_BorderColor = Editor->GetColor(StyleColor_PinRectBorder);
-    m_CurrentPort->m_BorderWidth = editorStyle.PinBorderWidth;
-    m_CurrentPort->m_Rounding    = editorStyle.PinRounding;
-    m_CurrentPort->m_Corners     = static_cast<int>(editorStyle.PinCorners);
-    m_CurrentPort->m_Radius      = editorStyle.PinRadius;
-    m_CurrentPort->m_ArrowSize   = editorStyle.PinArrowSize;
-    m_CurrentPort->m_ArrowWidth  = editorStyle.PinArrowWidth;
-    m_CurrentPort->m_Dir         = kind == PortKind::Output ? editorStyle.SourceDirection : editorStyle.TargetDirection;
-    m_CurrentPort->m_Strength    = editorStyle.LinkStrength;
-    m_CurrentPort->m_SnapLinkToDir = editorStyle.SnapLinkToPinDir != 0.0f;
-
-    m_CurrentNode->m_LastPort    = m_CurrentPort;
-
+    m_IsGroup = false;
+    
     if (auto drawList = Editor->GetDrawList())
     {
-        m_PinSplitter.Clear();
-        ImDrawList_SwapSplitter(drawList, m_PinSplitter);
+        m_PortSplitter.Clear();
+        ImDrawList_SwapSplitter(drawList, m_PortSplitter);
     }
 
+    // Begin outer group
     ImGui::BeginGroup();
+
+    // Apply frame padding. Begin inner group if necessary.
+    if (editorStyle.NodePadding.x != 0 || editorStyle.NodePadding.y != 0 || editorStyle.NodePadding.z != 0 || editorStyle.NodePadding.w != 0)
+    {
+        ImGui::SetCursorPos(ImGui::GetCursorPos() + ImVec2(editorStyle.NodePadding.x, editorStyle.NodePadding.y));
+        ImGui::BeginGroup();
+    }
 }
 
 void ed::NodeBuilder::EndPort()
 {
-    IM_ASSERT(nullptr != m_CurrentPin);
+    IM_ASSERT(nullptr != m_CurrentPort);
 
     if (auto drawList = Editor->GetDrawList())
     {
         IM_ASSERT(drawList->_Splitter._Count == 1); // Did you forgot to call drawList->ChannelsMerge()?
-        ImDrawList_SwapSplitter(drawList, m_PinSplitter);
+        ImDrawList_SwapSplitter(drawList, m_PortSplitter);
     }
 
+    // Apply frame padding. This must be done in this convoluted way if outer group
+    // size must contain inner group padding.
+    auto& editorStyle = Editor->GetStyle();
+    if (editorStyle.PortPadding.x != 0 || editorStyle.PortPadding.y != 0 || editorStyle.PortPadding.z != 0 || editorStyle.PortPadding.w != 0)
+    {
+        ImGui::EndGroup();
+        ImGui::SameLine(0, editorStyle.PortPadding.z);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+        ImGui::Dummy(ImVec2(0, 0)); // bump cursor at the end of the line and move to next one
+        ImGui::Dummy(ImVec2(0, editorStyle.PortPadding.w)); // apply padding
+        ImGui::PopStyleVar();
+    }
+
+    // End outer group.
     ImGui::EndGroup();
 
-    if (m_ResolvePinRect)
-        m_CurrentPin->m_Bounds = ImGui_GetItemRect();
+    ImRect m_PortRect = ImGui_GetItemRect();
+    m_PortRect.Floor();
 
-    if (m_ResolvePivot)
+    if (m_CurrentPort->m_Bounds.GetSize() != m_PortRect.GetSize())
     {
-        auto& pinRect = m_CurrentPin->m_Bounds;
-
-        if (m_PivotSize.x < 0)
-            m_PivotSize.x = pinRect.GetWidth();
-        if (m_PivotSize.y < 0)
-            m_PivotSize.y = pinRect.GetHeight();
-
-        m_CurrentPin->m_Pivot.Min = pinRect.Min + ImMul(pinRect.GetSize(), m_PivotAlignment);
-        m_CurrentPin->m_Pivot.Max = m_CurrentPin->m_Pivot.Min + ImMul(m_PivotSize, m_PivotScale);
+        m_CurrentPort->m_Bounds.Max = m_CurrentPort->m_Bounds.Min + m_PortRect.GetSize();
     }
 
-    // #debug: Draw pin bounds
-    //Editor->GetDrawList()->AddRect(m_CurrentPin->m_Bounds.Min, m_CurrentPin->m_Bounds.Max, IM_COL32(255, 255, 0, 255));
-
-    // #debug: Draw pin pivot rectangle
-    //Editor->GetDrawList()->AddRect(m_CurrentPin->m_Pivot.Min, m_CurrentPin->m_Pivot.Max, IM_COL32(255, 0, 255, 255));
-
-    m_CurrentPin = nullptr;
+    m_CurrentPort = nullptr;    
 }
 
 void ed::NodeBuilder::PinRect(const ImVec2& a, const ImVec2& b)
@@ -5846,6 +5854,9 @@ float* ed::Style::GetVarFloatAddr(StyleVar idx)
         case StyleVar_NodeBorderWidth:          return &NodeBorderWidth;
         case StyleVar_HoveredNodeBorderWidth:   return &HoveredNodeBorderWidth;
         case StyleVar_SelectedNodeBorderWidth:  return &SelectedNodeBorderWidth;
+        case StyleVar_PortBorderWidth:          return &PortBorderWidth;
+        case StyleVar_HoveredPortBorderWidth:   return &HoveredPortBorderWidth;
+        case StyleVar_SelectedPortBorderWidth:  return &SelectedPortBorderWidth;
         case StyleVar_PinRounding:              return &PinRounding;
         case StyleVar_PinBorderWidth:           return &PinBorderWidth;
         case StyleVar_LinkStrength:             return &LinkStrength;
@@ -5863,6 +5874,8 @@ float* ed::Style::GetVarFloatAddr(StyleVar idx)
         case StyleVar_SnapLinkToPinDir:         return &SnapLinkToPinDir;
         case StyleVar_HoveredNodeBorderOffset:  return &HoverNodeBorderOffset;
         case StyleVar_SelectedNodeBorderOffset: return &SelectedNodeBorderOffset;
+        case StyleVar_HoveredPortBorderOffset:  return &HoverPortBorderOffset;
+        case StyleVar_SelectedPortBorderOffset: return &SelectedPortBorderOffset;
         default:                                return nullptr;
     }
 }

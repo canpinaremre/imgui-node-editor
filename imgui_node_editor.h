@@ -152,6 +152,12 @@ enum StyleColor
     StyleColor_SelNodeBorder,
     StyleColor_NodeSelRect,
     StyleColor_NodeSelRectBorder,
+    StyleColor_PortBg,
+    StyleColor_PortBorder,
+    StyleColor_HovPortBorder,
+    StyleColor_SelPortBorder,
+    StyleColor_PortSelRect,
+    StyleColor_PortSelRectBorder,
     StyleColor_HovLinkBorder,
     StyleColor_SelLinkBorder,
     StyleColor_HighlightLinkBorder,
@@ -174,6 +180,9 @@ enum StyleVar
     StyleVar_NodeBorderWidth,
     StyleVar_HoveredNodeBorderWidth,
     StyleVar_SelectedNodeBorderWidth,
+    StyleVar_PortBorderWidth,
+    StyleVar_HoveredPortBorderWidth,
+    StyleVar_SelectedPortBorderWidth,
     StyleVar_PinRounding,
     StyleVar_PinBorderWidth,
     StyleVar_LinkStrength,
@@ -196,6 +205,8 @@ enum StyleVar
     StyleVar_SnapLinkToPinDir,
     StyleVar_HoveredNodeBorderOffset,
     StyleVar_SelectedNodeBorderOffset,
+    StyleVar_HoveredPortBorderOffset,
+    StyleVar_SelectedPortBorderOffset,
 
     StyleVar_Count
 };
@@ -209,6 +220,13 @@ struct Style
     float   HoverNodeBorderOffset;
     float   SelectedNodeBorderWidth;
     float   SelectedNodeBorderOffset;
+    ImVec4  PortPadding;
+    float   PortRounding;
+    float   PortBorderWidth;
+    float   HoveredPortBorderWidth;
+    float   HoverPortBorderOffset;
+    float   SelectedPortBorderWidth;
+    float   SelectedPortBorderOffset;
     float   PinRounding;
     float   PinBorderWidth;
     float   LinkStrength;
@@ -240,6 +258,13 @@ struct Style
         HoverNodeBorderOffset    = 0.0f;
         SelectedNodeBorderWidth  = 3.5f;
         SelectedNodeBorderOffset = 0.0f;
+        PortPadding              = ImVec4(8, 8, 8, 8);
+        PortRounding             = 12.0f;
+        PortBorderWidth          = 1.5f;
+        HoveredPortBorderWidth   = 3.5f;
+        HoverPortBorderOffset    = 0.0f;
+        SelectedPortBorderWidth  = 3.5f;
+        SelectedPortBorderOffset = 0.0f;
         PinRounding              = 4.0f;
         PinBorderWidth           = 0.0f;
         LinkStrength             = 100.0f;
@@ -273,6 +298,12 @@ struct Style
         Colors[StyleColor_SelNodeBorder]      = ImColor(255, 176,  50, 255);
         Colors[StyleColor_NodeSelRect]        = ImColor(  5, 130, 255,  64);
         Colors[StyleColor_NodeSelRectBorder]  = ImColor(  5, 130, 255, 128);
+        Colors[StyleColor_PortBg]             = ImColor(  5, 130, 255, 100);
+        Colors[StyleColor_PortBorder]         = ImColor(  5, 130, 255, 100);
+        Colors[StyleColor_HovPortBorder]      = ImColor(  5, 130, 255, 100);
+        Colors[StyleColor_SelPortBorder]      = ImColor(  5, 130, 255, 100);
+        Colors[StyleColor_PortSelRect]        = ImColor(  5, 130, 255, 100);
+        Colors[StyleColor_PortSelRectBorder]  = ImColor(  5, 130, 255, 100);
         Colors[StyleColor_HovLinkBorder]      = ImColor( 50, 176, 255, 255);
         Colors[StyleColor_SelLinkBorder]      = ImColor(255, 176,  50, 255);
         Colors[StyleColor_HighlightLinkBorder]= ImColor(204, 105,   0, 255);

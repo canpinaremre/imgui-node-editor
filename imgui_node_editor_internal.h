@@ -367,21 +367,17 @@ struct Port final: Object
     PortKind m_Kind;
     Node*   m_Node;
     ImRect  m_Bounds;
-    ImRect  m_Pivot;
+    
     Port*    m_PreviousPort;
+
     ImU32   m_Color;
     ImU32   m_BorderColor;
     float   m_BorderWidth;
     float   m_Rounding;
-    int     m_Corners;
+
     ImVec2  m_Dir;
     float   m_Strength;
-    float   m_Radius;
-    float   m_ArrowSize;
-    float   m_ArrowWidth;
-    bool    m_SnapLinkToDir;
-    bool    m_HasConnection;
-    bool    m_HadConnection;
+
 
     Port(EditorContext* editor, PortId id, PortKind kind)
         : Object(editor)
@@ -394,15 +390,8 @@ struct Port final: Object
         , m_BorderColor(IM_COL32_BLACK)
         , m_BorderWidth(0)
         , m_Rounding(0)
-        , m_Corners(0)
         , m_Dir(0, 0)
         , m_Strength(0)
-        , m_Radius(0)
-        , m_ArrowSize(0)
-        , m_ArrowWidth(0)
-        , m_SnapLinkToDir(true)
-        , m_HasConnection(false)
-        , m_HadConnection(false)
     {
     }
 
@@ -410,8 +399,6 @@ struct Port final: Object
 
     virtual void Reset() override final
     {
-        m_HadConnection = m_HasConnection && m_IsLive;
-        m_HasConnection = false;
 
         Object::Reset();
     }
@@ -1268,6 +1255,7 @@ struct NodeBuilder
 
     ImDrawListSplitter m_Splitter;
     ImDrawListSplitter m_PinSplitter;
+    ImDrawListSplitter m_PortSplitter;
 
     NodeBuilder(EditorContext* editor);
     ~NodeBuilder();
@@ -1408,7 +1396,7 @@ struct EditorContext
 
     void MarkNodeToRestoreState(Node* node);
     void UpdateNodeState(Node* node);
-
+    void UpdatePortState(Port* port);
     void RemoveSettings(Object* object);
 
     void ClearSelection();
