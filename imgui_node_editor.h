@@ -430,6 +430,7 @@ IMGUI_NODE_EDITOR_API void NavigateToSelection(bool zoomIn = false, float durati
 
 IMGUI_NODE_EDITOR_API bool ShowNodeContextMenu(NodeId* nodeId);
 IMGUI_NODE_EDITOR_API bool ShowPinContextMenu(PinId* pinId);
+IMGUI_NODE_EDITOR_API bool ShowPortContextMenu(PortId* portId);
 IMGUI_NODE_EDITOR_API bool ShowLinkContextMenu(LinkId* linkId);
 IMGUI_NODE_EDITOR_API bool ShowBackgroundContextMenu();
 

@@ -1069,6 +1069,7 @@ struct ContextMenuAction final: EditorAction
 
     bool ShowNodeContextMenu(NodeId* nodeId);
     bool ShowPinContextMenu(PinId* pinId);
+    bool ShowPortContextMenu(PortId* portId);
     bool ShowLinkContextMenu(LinkId* linkId);
     bool ShowBackgroundContextMenu();
 };

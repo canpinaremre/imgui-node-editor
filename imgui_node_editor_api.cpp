@@ -595,6 +595,10 @@ bool ax::NodeEditor::ShowPinContextMenu(PinId* pinId)
 {
     return s_Editor->GetContextMenu().ShowPinContextMenu(pinId);
 }
+bool ax::NodeEditor::ShowPortContextMenu(PortId* portId)
+{
+    return s_Editor->GetContextMenu().ShowPortContextMenu(portId);
+}
 
 bool ax::NodeEditor::ShowLinkContextMenu(LinkId* linkId)
 {

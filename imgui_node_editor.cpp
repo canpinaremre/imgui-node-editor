@@ -4411,6 +4411,16 @@ bool ed::ContextMenuAction::ShowPinContextMenu(PinId* pinId)
     return true;
 }
 
+bool ed::ContextMenuAction::ShowPortContextMenu(PortId* portId)
+{
+    if (m_CurrentMenu != Pin)
+        return false;
+
+    *portId = m_ContextId.AsPortId();
+    Editor->SetUserContext();
+    return true;
+}
+
 bool ed::ContextMenuAction::ShowLinkContextMenu(LinkId* linkId)
 {
     if (m_CurrentMenu != Link)
